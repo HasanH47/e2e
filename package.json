@@ -7,7 +7,7 @@
     "start": "node src/app.js",
     "test": "nodemon src/app.js"
   },
-  "author": "username-8X8",
+  "author": "wolf-77",
   "license": "MIT",
   "dependencies": {
     "express": "^4.17.1",

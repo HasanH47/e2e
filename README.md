@@ -9,4 +9,4 @@ End-to-End Encryption on socket.io web app
 ## Demo
 Demo link [E2E](https://e2e-01.herokuapp.com/)
 ## License 
-[MIT](https://github.com/username-8X8/E2E-01/blob/main/LICENSE)
+[MIT](https://github.com/wolf-77/e2e/blob/master/LICENSE)
