@@ -1,0 +1,19 @@
+{
+  "name": "chat-app",
+  "version": "1.0.0",
+  "description": "End-to-End(01) chat app",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "nodemon src/app.js"
+  },
+  "author": "username-8X8",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.17.1",
+    "socket.io": "^2.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.6"
+  }
+}

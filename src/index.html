@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <link rel="shortcut icon" type="image/png" href="/favicon-32x32.png">
+    <link rel="shortcut icon" type="image/png" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="viewport" content="width=device-width, initial-scale=0.8 maximum-scale=0.8,user-scalable=0">
+    <title>E2E-01</title>
+    <style>
+        input {
+            border: 2px solid;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+        .font {
+            font-family: 'Roboto Mono', monospace;
+        }
+        button {
+            width: 101mm;
+            border: 2px solid;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="join-room">
+        <div style="text-align: center;">
+            <h2 class="font">01</h2>
+            <h3 class="font">E2E (End-to-End) Encryption Chat</h3>
+        </div>
+        <div style="text-align: center;">
+            <form autocomplete="off">
+                <input type="text" name="username" placeholder="Username" size="60" required><br>
+                <input type="text" name="roomname" placeholder="Room Name" size="60" required><br>
+                <button id="join-room-btn">Join Chat</button>
+            </form>
+        </div>
+    </div>
+    <div id="chat-room">
+        <div style="text-align: center;">
+            <h3 class="font">RoomName/Username</h3>
+            <h3 id="chat-title" class="font"></h3>
+        </div>
+        <div id="chat-message" class="font" style="width: 101mm; margin-left: auto; margin-right: auto;"></div>
+        <div style="text-align: center;">
+            <form autocomplete="off">
+                <input name="message" type="text" placeholder="Message" size="60" required><br>
+                <button id="send-btn">Send</button>
+            </form>
+        </div>
+    </div>
+</body>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/node-forge@0.7.0/dist/forge.min.js"></script>
+<script type="text/javascript" src="https://cdn.rawgit.com/ricmoo/aes-js/e27b99df/index.js"></script>
+<script>
+    let socket = io();
+    let rsa = forge.pki.rsa;
+    let pki = forge.pki;
+
+    let chatHeader = document.getElementById('chat-title');
+    let usersMessages = document.getElementById('chat-message');
+    let form = document.querySelectorAll('form');
+    let joinRoom = document.getElementById('join-room');
+    let chatRoom = document.getElementById('chat-room');
+    let joinRoomBtn = document.getElementById('join-room-btn');
+
+    document.body.scrollIntoView();
+
+    chatRoom.style.display = 'none';
+
+    let submitForm = form[0];
+    let messageForm = form[1];
+
+    let user = [];
+    let secretKeys = [];
+    // index0 = public/private  index1 = groupkey
+
+    rsa.generateKeyPair({bits: 2048, workers: 2}, function(err, keypair) {
+        secretKeys.push({
+            publicKey: keypair.publicKey,
+            privateKey: keypair.privateKey
+        });
+        console.log(keypair);
+        console.log('user public & private keys generated');
+    });
+
+    submitForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        user.push({
+            username: submitForm.username.value,
+            roomname: submitForm.roomname.value
+        });
+        socket.emit('new-user', {
+            username: user[0].username,
+            roomname: user[0].roomname,
+            pkey: pki.publicKeyToPem(secretKeys[0].publicKey)
+        }, (error) => {
+            console.log(error);
+            if(error === false){
+                joinRoomBtn.disabled = true;
+            }
+            else if(error !== true){
+                alert(error);
+                location.href = '/';
+            } else {
+                console.log('generate key ...');
+
+                var groupKey = forge.util.bytesToHex(forge.random.getBytesSync(8));
+                secretKeys.push({groupKey});
+                console.log(secretKeys);
+
+                joinRoom.style.display = 'none';
+                chatHeader.innerText = user[0].roomname + '/' + user[0].username;
+                chatRoom.style.display = 'block';
+            }
+        });
+    });
+
+    let encoder = new TextEncoder();
+
+    messageForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        let username = user[0].username;
+        let roomname = user[0].roomname;
+        let message = messageForm.message.value;
+        let date = new Date().toLocaleString();
+
+        console.log('message:', message);
+
+        var key = encoder.encode(secretKeys[1].groupKey);
+        console.log(key);
+        var textBytes = aesjs.utils.utf8.toBytes(message);
+        var aesCtr = new aesjs.ModeOfOperation.ctr(key);
+        var encrypted = aesCtr.encrypt(textBytes);
+
+        encrypted = aesjs.utils.hex.fromBytes(encrypted);
+        console.log(encrypted);
+
+        socket.emit('chat-message', {username, roomname, encrypted, date});
+        console.log('send : ', {username, roomname, encrypted, date});
+        messageForm.message.value = '';
+    });
+
+    socket.on('connect', () => {
+        console.log('connected to wss');
+    });
+
+    socket.on('chat-message', (data) => {
+        console.log('recived : ', data);
+
+        var key = encoder.encode(secretKeys[1].groupKey);
+        var encryptedBytes = aesjs.utils.hex.toBytes(data.encrypted);
+        var aesCtr = new aesjs.ModeOfOperation.ctr(key);
+        var decryptedBytes = aesCtr.decrypt(encryptedBytes);
+        var message = aesjs.utils.utf8.fromBytes(decryptedBytes);
+        
+        let div = document.createElement('div');
+        div.innerHTML = `<h5>${data.username} :</h5><p>${message}</p>`;
+        usersMessages.appendChild(div);
+
+        document.body.scrollIntoView();
+        window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    socket.on('total-users', data => console.log('users in room:', data));
+
+    socket.on('send-secret-key', data => {
+        console.log(data);
+        let pkey = pki.publicKeyFromPem(data.pkey);
+        socket.emit('group-secret-key', {
+            id: data.id,
+            // encrypt group secret key with reciver public key
+            gkey: pkey.encrypt(secretKeys[1].groupKey, 'RSA-OAEP')
+        });
+    });
+
+    socket.on('e2ee', data => {
+        console.log(data);
+        // decrypt group key with private key
+        if(data.gkey){
+            let groupKey = secretKeys[0].privateKey.decrypt(data.gkey, 'RSA-OAEP');
+            console.log('decrypt group secret key', groupKey);
+            secretKeys.push({groupKey});
+            console.log(secretKeys);
+
+            joinRoom.style.display = 'none';
+            chatHeader.innerText = user[0].roomname + '/' + user[0].username;
+            chatRoom.style.display = 'block';
+        }
+    });
+</script>
+</html>
