@@ -6,7 +6,5 @@ End-to-End Encryption on socket.io web app
 ## Install and Usage
 1. in project directory `npm install`
 2. go to localhost:3000/
-## Demo
-Demo link [E2E](https://e2e-01.herokuapp.com/)
 ## License 
 [MIT](https://github.com/wolf-77/e2e/blob/master/LICENSE)
